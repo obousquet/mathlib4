@@ -34,8 +34,55 @@ of `s` and some element of the set family, and we denote this `𝒜.Shatters s`.
 is *traced* by `𝒜`. -/
 def Shatters (𝒜 : Finset (Finset α)) (s : Finset α) : Prop := ∀ ⦃t⦄, t ⊆ s → ∃ u ∈ 𝒜, s ∩ u = t
 
-instance : DecidablePred 𝒜.Shatters := fun _s ↦ decidableForallOfDecidableSubsets
+/-- A set family `𝒜` strongly shatters a set `s` if there exists a set `u` disjoint from `s` such
+that `𝒜` contains `u ∪ t` for any subset `t` of `s`. We denote this by `𝒜.StronglyShatters s`. -/
+def StronglyShatters (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
+  ∃ u ∈ 𝒜, u ∩ s = ∅ ∧ (∀ ⦃t⦄, t ⊆ s → u ∪ t ∈ 𝒜)
 
+instance : DecidablePred 𝒜.Shatters := fun _s ↦ decidableForallOfDecidableSubsets
+instance : DecidablePred 𝒜.StronglyShatters := fun _s ↦ decidableExistsAndFinset
+
+lemma StronglyShatters.implies_shatters (h: StronglyShatters 𝒜 s) : Shatters 𝒜 s := by
+  obtain ⟨v, ⟨_, hvs, hts ⟩⟩ := h
+  intro t ht
+  specialize hts ht
+  use v ∪ t
+  rw [inter_distrib_left, inter_comm, hvs, empty_union, inter_eq_right]
+  exact ⟨hts, ht⟩
+
+def StronglyShattersDiff (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
+  ∃ u ∈ 𝒜, ∀ ⦃t⦄, t ⊆ s → (u ∪ t) \ (u ∩ t) ∈ 𝒜
+
+lemma StronglyShatters.diff  (𝒜 : Finset (Finset α)) (s : Finset α) :
+  StronglyShatters 𝒜 s ↔ 𝒜.StronglyShattersDiff s := by
+  constructor
+  intro h
+  obtain ⟨v, ⟨vA, hvs, hts⟩⟩ := h
+  use v
+  constructor
+  exact vA
+  intro tt htt
+  specialize hts htt
+  rw [← inter_eq_left] at htt
+  have hh: v ∩ tt = ∅ := by rw [← htt, inter_comm, inter_assoc, inter_comm s v, hvs, inter_empty]
+  rw [hh, sdiff_empty]
+  exact hts
+  intro h
+  obtain ⟨v, ⟨vA, hts⟩⟩ := h
+  use v \ s
+  have hh: v \ s = (v ∪ (v ∩ s)) \ (v ∩ (v ∩ s)) := by rw[union_distrib_left, union_self, inter_comm, union_inter_cancel_left, ← inter_assoc, inter_self, sdiff_inter_self_left]
+  have hvs: v ∩ s ⊆ s := by sorry
+  constructor
+  specialize hts hvs
+  rw [hh]
+  exact hts
+  constructor
+  rw [@sdiff_inter_self]
+  intro t ht
+  have htv: t \ v ⊆ s := by sorry
+  specialize hts htv
+
+#print StronglyShatters.diff
 lemma Shatters.exists_inter_eq_singleton (hs : Shatters 𝒜 s) (ha : a ∈ s) : ∃ t ∈ 𝒜, s ∩ t = {a} :=
   hs <| singleton_subset_iff.2 ha
 
@@ -50,6 +97,20 @@ lemma Shatters.exists_superset (h : 𝒜.Shatters s) : ∃ t ∈ 𝒜, s ⊆ t :
 
 lemma shatters_of_forall_subset (h : ∀ t, t ⊆ s → t ∈ 𝒜) : 𝒜.Shatters s :=
   fun t ht ↦ ⟨t, h _ ht, inter_eq_right.2 ht⟩
+
+lemma strongly_shatters_of_forall_subset (h : ∀ t, t ⊆ s → t ∈ 𝒜) : 𝒜.StronglyShatters s := by
+  use ∅
+  constructor
+  exact h ∅ (empty_subset s)
+  constructor
+  rw [empty_inter]
+  intro tt htt
+  rw [union_comm, union_empty]
+  exact h tt htt
+
+
+def restriction (𝒜: Finset (Finset α)) (s: Finset α): Finset (Finset α) :=
+  sorry
 
 protected lemma Shatters.nonempty (h : 𝒜.Shatters s) : 𝒜.Nonempty :=
   let ⟨t, ht, _⟩ := h Subset.rfl; ⟨t, ht⟩
@@ -72,6 +133,10 @@ lemma univ_shatters [Fintype α] : univ.Shatters s :=
 
 /-- The set family of sets that are shattered by `𝒜`. -/
 def shatterer (𝒜 : Finset (Finset α)) : Finset (Finset α) := (𝒜.biUnion powerset).filter 𝒜.Shatters
+
+/-- The set family of sets that are strongly shattered by `𝒜`. -/
+def strong_shatterer (𝒜 : Finset (Finset α)) : Finset (Finset α) :=
+  (𝒜.biUnion powerset).filter 𝒜.StronglyShatters
 
 @[simp] lemma mem_shatterer : s ∈ 𝒜.shatterer ↔ 𝒜.Shatters s := by
   refine mem_filter.trans <| and_iff_right_of_imp fun h ↦ ?_
