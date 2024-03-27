@@ -5,6 +5,7 @@ Authors: Yaël Dillies
 -/
 import Mathlib.Data.Nat.Interval
 import Mathlib.Order.UpperLower.Basic
+import Mathlib.Order.SymmDiff
 import Mathlib.Combinatorics.SetFamily.Compression.Down
 
 /-!
@@ -24,7 +25,7 @@ This file defines the shattering property and VC-dimension of set families.
 * Strong shattering
 -/
 
-open scoped BigOperators FinsetFamily
+open scoped BigOperators FinsetFamily symmDiff
 
 namespace Finset
 variable {α : Type*} [DecidableEq α] {𝒜 ℬ : Finset (Finset α)} {s t : Finset α} {a : α} {n : ℕ}
@@ -45,44 +46,53 @@ instance : DecidablePred 𝒜.StronglyShatters := fun _s ↦ decidableExistsAndF
 lemma StronglyShatters.implies_shatters (h: StronglyShatters 𝒜 s) : Shatters 𝒜 s := by
   obtain ⟨v, ⟨_, hvs, hts ⟩⟩ := h
   intro t ht
-  specialize hts ht
   use v ∪ t
   rw [inter_distrib_left, inter_comm, hvs, empty_union, inter_eq_right]
-  exact ⟨hts, ht⟩
+  exact ⟨hts ht, ht⟩
 
-def StronglyShattersDiff (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
-  ∃ u ∈ 𝒜, ∀ ⦃t⦄, t ⊆ s → (u ∪ t) \ (u ∩ t) ∈ 𝒜
+def StronglyShattersSymmDiff (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
+  ∃ u ∈ 𝒜, ∀ ⦃t⦄, t ⊆ s → u ∆ t ∈ 𝒜
 
 lemma StronglyShatters.diff  (𝒜 : Finset (Finset α)) (s : Finset α) :
-  StronglyShatters 𝒜 s ↔ 𝒜.StronglyShattersDiff s := by
+  StronglyShatters 𝒜 s ↔ 𝒜.StronglyShattersSymmDiff s := by
   constructor
-  intro h
-  obtain ⟨v, ⟨vA, hvs, hts⟩⟩ := h
-  use v
-  constructor
-  exact vA
-  intro tt htt
-  specialize hts htt
-  rw [← inter_eq_left] at htt
-  have hh: v ∩ tt = ∅ := by rw [← htt, inter_comm, inter_assoc, inter_comm s v, hvs, inter_empty]
-  rw [hh, sdiff_empty]
-  exact hts
-  intro h
-  obtain ⟨v, ⟨vA, hts⟩⟩ := h
-  use v \ s
-  have hh: v \ s = (v ∪ (v ∩ s)) \ (v ∩ (v ∩ s)) := by rw[union_distrib_left, union_self, inter_comm, union_inter_cancel_left, ← inter_assoc, inter_self, sdiff_inter_self_left]
-  have hvs: v ∩ s ⊆ s := by sorry
-  constructor
-  specialize hts hvs
-  rw [hh]
-  exact hts
-  constructor
-  rw [@sdiff_inter_self]
-  intro t ht
-  have htv: t \ v ⊆ s := by sorry
-  specialize hts htv
+  . intro h
+    obtain ⟨v, ⟨vA, hvs, hts⟩⟩ := h
+    use v
+    constructor
+    . exact vA
+    . intro tt htt
+      specialize hts htt
+      have hh: v ∩ tt = ∅ :=
+        subset_empty.1 <| le_trans (@inter_subset_inter_left _ _ v tt s htt) <| le_of_eq hvs
+      rw [symmDiff_eq_sup_sdiff_inf, inf_eq_inter, hh, sdiff_empty, sup_eq_union]
+      exact hts
+  . intro h
+    obtain ⟨v, ⟨_, hts⟩⟩ := h
+    use v ∆ (v ∩ s)
+    have hvs: v ∩ s ⊆ s := by rw [← inter_eq_left, inter_assoc, inter_self]
+    constructor
+    . exact hts hvs
+    . constructor
+      . have vss : v ∆ (v ∩ s) = v \ s :=
+          by rw[symmDiff_of_ge]; rw [sdiff_inter_self_left]; exact inter_subset_left v s
+        have h0 : v ∆ (v ∩ s) ∩ s = ∅ := by rw[vss, sdiff_inter_self]
+        exact h0
+      . intro tt htt
+        have vss : v ∆ (v ∩ s) = v \ s :=
+          by rw[symmDiff_of_ge]; rw [sdiff_inter_self_left]; exact inter_subset_left v s
+        have httv : (v ∩ s) ∆ tt ⊆ s :=
+          le_trans (@symmDiff_le_sup _ _ (v ∩ s) tt) (sup_le (inter_subset_right v s) htt)
+        specialize hts httv
+        rw [← symmDiff_assoc, vss] at hts
+        rw [vss]
+        have hvstt: (v \ s) ∩ tt = ∅ :=
+          subset_empty.1 <|
+            le_trans (@inter_subset_inter_left _ _ (v \ s) tt s htt) <|
+            le_of_eq (sdiff_inter_self s v)
+        rw [symmDiff_eq_sup_sdiff_inf, inf_eq_inter, hvstt, sdiff_empty, sup_eq_union] at hts
+        exact hts
 
-#print StronglyShatters.diff
 lemma Shatters.exists_inter_eq_singleton (hs : Shatters 𝒜 s) (ha : a ∈ s) : ∃ t ∈ 𝒜, s ∩ t = {a} :=
   hs <| singleton_subset_iff.2 ha
 
@@ -107,7 +117,6 @@ lemma strongly_shatters_of_forall_subset (h : ∀ t, t ⊆ s → t ∈ 𝒜) : �
   intro tt htt
   rw [union_comm, union_empty]
   exact h tt htt
-
 
 def restriction (𝒜: Finset (Finset α)) (s: Finset α): Finset (Finset α) :=
   sorry
