@@ -16,13 +16,14 @@ This file defines the shattering property and VC-dimension of set families.
 ## Main declarations
 
 * `Finset.Shatters`: The shattering property.
+* `Finset.StronglyShatters`: The strong shattering property.
 * `Finset.shatterer`: The set family of sets shattered by a set family.
+* `Finset.strong_shatterer`: The set family of sets strongly shattered by a set family.
 * `Finset.vcDim`: The Vapnik-Chervonenkis dimension.
 
 ## TODO
 
 * Order-shattering
-* Strong shattering
 -/
 
 open scoped BigOperators FinsetFamily symmDiff
@@ -38,23 +39,24 @@ def Shatters (𝒜 : Finset (Finset α)) (s : Finset α) : Prop := ∀ ⦃t⦄, 
 /-- A set family `𝒜` strongly shatters a set `s` if there exists a set `u` disjoint from `s` such
 that `𝒜` contains `u ∪ t` for any subset `t` of `s`. We denote this by `𝒜.StronglyShatters s`. -/
 def StronglyShatters (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
-  ∃ u ∈ 𝒜, u ∩ s = ∅ ∧ (∀ ⦃t⦄, t ⊆ s → u ∪ t ∈ 𝒜)
+  ∃ u∈ 𝒜, u ∩ s = ∅ ∧ (∀ ⦃t⦄, t ⊆ s → u ∪ t ∈ 𝒜)
 
 instance : DecidablePred 𝒜.Shatters := fun _s ↦ decidableForallOfDecidableSubsets
 instance : DecidablePred 𝒜.StronglyShatters := fun _s ↦ decidableExistsAndFinset
 
-lemma StronglyShatters.implies_shatters (h: StronglyShatters 𝒜 s) : Shatters 𝒜 s := by
+lemma strongly_shatters_shatters (h: StronglyShatters 𝒜 s) : Shatters 𝒜 s := by
   obtain ⟨v, ⟨_, hvs, hts ⟩⟩ := h
   intro t ht
   use v ∪ t
   rw [inter_distrib_left, inter_comm, hvs, empty_union, inter_eq_right]
   exact ⟨hts ht, ht⟩
 
+/-- An equivalent definition of strong shattering. -/
 def StronglyShattersSymmDiff (𝒜 : Finset (Finset α)) (s : Finset α) : Prop :=
   ∃ u ∈ 𝒜, ∀ ⦃t⦄, t ⊆ s → u ∆ t ∈ 𝒜
 
 lemma StronglyShatters.diff  (𝒜 : Finset (Finset α)) (s : Finset α) :
-  StronglyShatters 𝒜 s ↔ 𝒜.StronglyShattersSymmDiff s := by
+  𝒜.StronglyShatters s ↔ 𝒜.StronglyShattersSymmDiff s := by
   constructor
   . intro h
     obtain ⟨v, ⟨vA, hvs, hts⟩⟩ := h
